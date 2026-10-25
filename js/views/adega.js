@@ -1,10 +1,11 @@
 // Adega: "Já bebemos" e "Quero provar", com os avisos do que falta pra você.
-import { S, NOMES, esc, avatar, thumb, origem, notasCurtas, quemTxt, media, estrelas, estrelasTxt, virgula, pendentes, assinar, plain, ICONE } from "../core.js";
+import { S, NOMES, esc, avatar, thumb, origem, notasCurtas, quemTxt, media, estrelas, estrelasTxt, virgula, pendentes, assinar, plain, outra, ICONE } from "../core.js";
 
 export async function telaAdega(el) {
   const vinhos = S.vinhos;
   await assinar(vinhos.map((v) => v.rotulo_path));
-  const pend = pendentes(S.pessoa);
+  // o que falta pros dois (muitas vezes um celular faz pelo casal), primeiro o de quem está com o celular
+  const pend = [S.pessoa, outra(S.pessoa)].flatMap((p) => pendentes(p).map((x) => ({ ...x, p })));
   const nB = vinhos.filter((v) => v.status === "bebido").length;
   const nQ = vinhos.length - nB;
 
@@ -17,15 +18,15 @@ export async function telaAdega(el) {
       <a href="#/nos" class="duo" aria-label="Nós">${avatar("wang")}${avatar("clara")}</a>
     </div>
 
-    ${pend.slice(0, 3).map(({ v, falta }) => `
-      <a class="pendente" href="${falta === "nota" ? `#/vinho/${v.id}/editar` : `#/comparar/${v.id}`}">
-        ${avatar(v.criado_por && v.criado_por !== S.pessoa ? v.criado_por : S.pessoa, 40)}
+    ${pend.slice(0, 4).map(({ v, falta, p }) => `
+      <a class="pendente" href="${falta === "nota" ? `#/vinho/${v.id}/editar` : `#/comparar/${v.id}/${p}`}">
+        ${avatar(p, 40)}
         <span>${falta === "nota"
-          ? `<b>${v.criado_por && v.criado_por !== S.pessoa ? `${NOMES[v.criado_por]} cadastrou` : "Falta sua nota:"} ${esc(v.nome)}.</b> Dê sua nota e encaixe no seu ranking.`
-          : `<b>Encaixe ${esc(v.nome)}</b> no seu ranking de ${v.tipo === "tinto" ? "tintos" : "brancos e rosés"}.`}</span>
+          ? `<b>Falta a nota ${p === "wang" ? "do Wang" : "da Clara"}:</b> ${esc(v.nome)}.`
+          : `<b>${NOMES[p]}: encaixe ${esc(v.nome)}</b> no ranking de ${v.tipo === "tinto" ? "tintos" : "brancos e rosés"}.`}</span>
         <span style="flex:0;color:var(--vinho)">${ICONE.seta}</span>
       </a>`).join("")}
-    ${pend.length > 3 ? `<div class="peq">e mais ${pend.length - 3} esperando você</div>` : ""}
+    ${pend.length > 4 ? `<div class="peq">e mais ${pend.length - 4} esperando vocês</div>` : ""}
 
     <div class="seg" role="group" aria-label="Lista">
       <button data-tab="bebido" aria-pressed="${S.tabAdega === "bebido"}">Já bebemos · ${nB}</button>

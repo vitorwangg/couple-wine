@@ -1,5 +1,5 @@
 // Service worker: deixa o app abrir rápido e funcionar como app instalado.
-const CACHE = "couple-wine-v1";
+const CACHE = "couple-wine-v2";
 const SHELL = ["./", "index.html", "style.css", "app.js", "config.js", "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {

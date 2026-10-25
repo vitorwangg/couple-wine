@@ -14,6 +14,7 @@ export async function telaBuscar(el) {
       <label class="cam" aria-label="Fotografar rótulo">${ICONE.camera}<input id="foto" type="file" accept="image/*" capture="environment"></label>
     </form>
     <div class="mao" style="font-size:18px;margin-top:-6px">escreva o nome ou tire foto do rótulo</div>
+    <button class="btn grande" type="submit" form="f">${ICONE.lupa}Buscar</button>
     <div id="previa"></div>
     <div id="res"></div>
     <a href="#/novo" id="mao" class="btn texto" style="align-self:flex-start">Cadastrar à mão, sem buscar</a>`;
@@ -21,11 +22,12 @@ export async function telaBuscar(el) {
   const q = el.querySelector("#q"), res = el.querySelector("#res"), previa = el.querySelector("#previa");
   let foto = null;
 
-  el.querySelector("#mao").addEventListener("click", () => { S.draft = { nome: q.value.trim() || "", tipo: "tinto" }; });
+  el.querySelector("#mao").addEventListener("click", () => { S.draft = { nome: q.value.trim() || "", tipo: "tinto", _manual: true }; });
 
   const rodar = async () => {
     const texto = q.value.trim();
     if (!texto && !foto) { q.focus(); return; }
+    res.scrollIntoView({ behavior: "smooth", block: "start" });
     res.innerHTML = `<div class="carregando"><div class="taca-gira"></div><div><b>Procurando nas adegas do mundo…</b><br><span class="peq">leva uns 10 a 20 segundos</span></div></div>`;
     try {
       const r = await buscar({ modo: "identificar", texto, imagem: foto?.b64, mime: "image/jpeg" });

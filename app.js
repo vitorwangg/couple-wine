@@ -19,7 +19,7 @@ const ROTAS = [
   [/^\/novo$/, telaForm, { semNav: true }],
   [/^\/vinho\/([\w-]+)\/(editar|beber)$/, telaForm, { semNav: true }],
   [/^\/vinho\/([\w-]+)$/, telaFicha, { semNav: true }],
-  [/^\/comparar\/([\w-]+)$/, telaComparar, { semNav: true }],
+  [/^\/comparar\/([\w-]+)(?:\/(wang|clara))?$/, telaComparar, { semNav: true }],
   [/^\/rankings$/, telaRankings, { tab: "rankings" }],
   [/^\/numeros$/, telaNumeros, { tab: "numeros" }],
   [/^\/nos$/, telaNos, { tab: "nos" }],

@@ -1,9 +1,10 @@
 // Encaixar no ranking: "qual foi melhor?" (busca binária, no máximo ~log2(n) perguntas).
 import { sb, S, NOMES, esc, avatar, thumb, origem, bebidos, bebeu, notaDe, grupo, GRUPOS, achar, carregar, assinar, outra, toast, ICONE } from "../core.js";
 
-export async function telaComparar(el, id) {
+// pessoa: de quem é o ranking (no mesmo celular dá pra encaixar pelos dois)
+export async function telaComparar(el, id, pessoa) {
   const v = achar(id);
-  const eu = S.pessoa;
+  const eu = pessoa || S.pessoa;
   if (!v || !bebeu(v, eu) || notaDe(v, eu) == null) { location.hash = v ? `#/vinho/${id}` : "#/"; return; }
 
   // meu ranking desse tipo, sem o vinho novo
@@ -28,17 +29,17 @@ export async function telaComparar(el, id) {
     <span style="display:flex;flex-direction:column;gap:4px">
       ${selo}
       <span class="nm">${esc(x.nome)}</span>
-      <span class="peq">${esc(origem(x))} · sua nota ${notaDe(x, eu)}</span>
+      <span class="peq">${esc(origem(x))} · nota ${eu === "wang" ? "do Wang" : "da Clara"} ${notaDe(x, eu)}</span>
     </span>`;
 
   const perguntar = () => {
     const mid = Math.floor((lo + hi) / 2);
     const rival = lista[mid];
     el.innerHTML = cabecalho() + `
-      <h1>Qual foi <em style="font-style:italic">melhor</em>?</h1>
+      <h1>${NOMES[eu]}, qual foi <em style="font-style:italic">melhor</em>?</h1>
       <button class="duelo" id="novo">${cartao(v, `<span class="tag" style="align-self:flex-start;background:var(--toalha);color:var(--papel)">NOVO</span>`)}</button>
       <div class="ou">ou</div>
-      <button class="duelo" id="rival">${cartao(rival, `<span class="tag" style="align-self:flex-start">#${mid + 1} no seu ranking</span>`)}</button>
+      <button class="duelo" id="rival">${cartao(rival, `<span class="tag" style="align-self:flex-start">#${mid + 1} no ranking ${eu === "wang" ? "do Wang" : "da Clara"}</span>`)}</button>
       <button class="btn texto" id="empate" style="align-self:center">Empate / não lembro bem</button>`;
     el.querySelector("#novo").addEventListener("click", () => { hi = mid; perguntas++; seguir(); });
     el.querySelector("#rival").addEventListener("click", () => { lo = mid + 1; perguntas++; seguir(); });
@@ -59,7 +60,9 @@ export async function telaComparar(el, id) {
   const pronto = (pos) => {
     const final = [...lista.slice(0, pos - 1), v, ...lista.slice(pos - 1)];
     const o = outra(eu);
-    const outraFalta = bebeu(v, o) && (notaDe(v, o) == null || achar(v.id).n[o]?.ordem == null);
+    const atual = achar(v.id);
+    const outraFalta = bebeu(v, o) && (notaDe(atual, o) == null || atual.n[o]?.ordem == null);
+    const outraPodeAgora = outraFalta && notaDe(atual, o) != null;
     el.innerHTML = cabecalho() + `
       <div class="mao" style="font-size:24px">perfetto!</div>
       <h1 style="margin-top:-8px">${esc(v.nome)} entrou em <em>#${pos}</em></h1>
@@ -71,10 +74,12 @@ export async function telaComparar(el, id) {
             <span class="peq">${x.id === v.id ? "novo" : ""}</span>
           </div>`).join("")}
       </div>
-      ${outraFalta ? `<p class="sub" style="margin:0">${NOMES[o]} vai ver um aviso pra ${notaDe(v, o) == null ? "dar a nota e " : ""}encaixar no ranking ${o === "wang" ? "dele" : "dela"}.</p>` : ""}
+      ${outraPodeAgora ? `<a href="#/comparar/${v.id}/${o}" class="btn grande">${avatar(o, 30)}Agora ${o === "wang" ? "o Wang" : "a Clara"}: encaixar no ranking ${o === "wang" ? "dele" : "dela"}</a>`
+        : outraFalta ? `<div class="linha-btns"><a href="#/vinho/${v.id}/editar" class="btn contorno">Dar a nota ${o === "wang" ? "do Wang" : "da Clara"} agora</a></div>
+          <p class="sub" style="margin:0">Ou deixe: fica um aviso na adega pra depois.</p>` : ""}
       <div class="linha-btns">
-        <a href="#/comparar/${v.id}" class="btn contorno" id="refazer">Refazer</a>
-        <a href="#/rankings" class="btn">Ver rankings</a>
+        <a href="#/comparar/${v.id}/${eu}" class="btn contorno" id="refazer">Refazer</a>
+        <a href="#/rankings" class="btn ${outraPodeAgora ? "contorno" : ""}">Ver rankings</a>
       </div>
       <a href="#/" class="btn texto" style="align-self:center">Voltar pra adega</a>`;
     el.querySelector("#refazer").addEventListener("click", (e) => { e.preventDefault(); lo = 0; hi = lista.length; perguntas = 0; inicio(); });

@@ -1,7 +1,16 @@
 // Cadastrar na adega (novo, "bebemos!" de um vinho da lista, ou editar).
 import { sb, S, PESSOAS, esc, avatar, thumb, assinar, urlDe, comprimir, subirFoto, carregar, achar, atualizarPreco,
-  estrelas, estrelasTxt, virgula, hojeIso, grupo, toast, TIPOS, ICONE } from "../core.js";
+  estrelas, estrelasTxt, virgula, hojeIso, grupo, toast, outra, buscar, brl, TIPOS, ICONE } from "../core.js";
 import { limparBusca } from "./buscar.js";
+
+// listas que vão completando enquanto digita
+const UVAS = ["Malbec", "Cabernet Sauvignon", "Merlot", "Pinot Noir", "Syrah", "Carmenère", "Tannat", "Tempranillo", "Sangiovese",
+  "Nebbiolo", "Touriga Nacional", "Aragonez", "Grenache", "Primitivo", "Montepulciano", "Corvina", "Nero d'Avola", "Barbera",
+  "Cabernet Franc", "Petit Verdot", "Bonarda", "País", "Zinfandel", "Pinotage", "Corte (blend)",
+  "Chardonnay", "Sauvignon Blanc", "Torrontés", "Riesling", "Alvarinho", "Pinot Grigio", "Viognier", "Moscato", "Gewürztraminer",
+  "Chenin Blanc", "Sémillon", "Verdejo", "Antão Vaz", "Arinto", "Loureiro", "Glera", "Trebbiano", "Vermentino", "Fiano", "Encruzado"];
+const PAISES = ["Argentina", "Chile", "Uruguai", "Brasil", "Itália", "França", "Portugal", "Espanha", "Estados Unidos", "Alemanha",
+  "Áustria", "África do Sul", "Austrália", "Nova Zelândia", "Grécia", "Hungria", "Líbano", "Israel", "Peru", "México"];
 
 export async function telaForm(el, id, modo) {
   const existente = id ? achar(id) : null;
@@ -16,7 +25,7 @@ export async function telaForm(el, id, modo) {
     compraria: base.compraria ?? null,
     foto: null,
   };
-  const manual = !base.nome;
+  const manual = !base.nome || !!base._manual;
 
   el.innerHTML = `
     <div class="cab">
@@ -33,7 +42,8 @@ export async function telaForm(el, id, modo) {
     <form id="f" style="display:flex;flex-direction:column;gap:20px">
       <details class="mais-dados" ${manual ? "open" : ""}>
         <summary>${manual ? "Dados do vinho" : "Corrigir dados do vinho"}</summary>
-        <label class="campo"><span class="lbl">Nome</span><input class="inp" name="nome" required value="${esc(base.nome || "")}"></label>
+        <label class="campo"><span class="lbl">Nome</span><input class="inp" name="nome" required autocomplete="off" placeholder="Ex.: DV Catena 2020" value="${esc(base.nome || "")}"></label>
+        <div id="sugs" class="sugs" aria-live="polite"></div>
         <label class="campo"><span class="lbl">Produtor</span><input class="inp" name="produtor" value="${esc(base.produtor || "")}"></label>
         <div class="campo" style="margin-top:12px"><span class="lbl">Tipo</span>
           <div class="seg" role="group" aria-label="Tipo" id="tipo">
@@ -41,11 +51,17 @@ export async function telaForm(el, id, modo) {
           </div>
         </div>
         <div class="grade2">
-          <label class="campo"><span class="lbl">Uva</span><input class="inp" name="uva" value="${esc(base.uva || "")}"></label>
-          <label class="campo"><span class="lbl">País</span><input class="inp" name="pais" value="${esc(base.pais || "")}"></label>
+          <label class="campo"><span class="lbl">Uva</span><input class="inp" name="uva" list="lista-uvas" autocomplete="off" value="${esc(base.uva || "")}"></label>
+          <label class="campo"><span class="lbl">País</span><input class="inp" name="pais" list="lista-paises" autocomplete="off" value="${esc(base.pais || "")}"></label>
+          <datalist id="lista-uvas">${UVAS.map((u) => `<option value="${u}"></option>`).join("")}</datalist>
+          <datalist id="lista-paises">${PAISES.map((p) => `<option value="${p}"></option>`).join("")}</datalist>
         </div>
         <label class="campo"><span class="lbl">Região</span><input class="inp" name="regiao" value="${esc(base.regiao || "")}"></label>
       </details>
+
+      <label class="campo"><span class="lbl">Ano do vinho (safra)</span>
+        <input class="inp" name="safra" inputmode="numeric" maxlength="4" placeholder="Ex.: 2021" value="${esc(base.safra || "")}" style="font-size:20px;font-weight:700;max-width:180px">
+      </label>
 
       <div class="campo">
         <span class="lbl">Quem bebeu?</span>
@@ -59,12 +75,10 @@ export async function telaForm(el, id, modo) {
 
       <div class="card notas" id="notas"></div>
 
-      <div class="grade2">
-        <label class="campo"><span class="lbl">Safra</span><input class="inp" name="safra" inputmode="numeric" pattern="[0-9]{4}" placeholder="2021" value="${esc(base.safra || "")}"></label>
-        <label class="campo"><span class="lbl">Quando</span><input class="inp" name="bebido_em" type="date" value="${esc(base.bebido_em || hojeIso())}"></label>
-      </div>
+      <label class="campo"><span class="lbl">Quando bebemos</span><input class="inp" name="bebido_em" type="date" value="${esc(base.bebido_em || hojeIso())}"></label>
       <label class="campo"><span class="lbl">Quanto pagamos</span>
         <span class="inp prefixo"><span>R$</span><input name="preco_pago" inputmode="decimal" placeholder="0,00" value="${base.preco_pago != null ? esc(virgula(base.preco_pago)) : ""}"></span>
+        <span class="peq" id="mercado"></span>
       </label>
       <label class="campo"><span class="lbl">Onde <span style="text-transform:none;font-weight:500">(opcional)</span></span><input class="inp" name="onde" placeholder="Restaurante, loja, casa…" value="${esc(base.onde || "")}"></label>
 
@@ -92,10 +106,63 @@ export async function telaForm(el, id, modo) {
   let tipo = base.tipo || "tinto";
 
   // tipo
-  el.querySelectorAll("#tipo button").forEach((b) => b.addEventListener("click", () => {
-    tipo = b.dataset.v;
-    el.querySelectorAll("#tipo button").forEach((x) => x.setAttribute("aria-pressed", x === b));
-  }));
+  const marcarTipo = (t) => {
+    tipo = t;
+    el.querySelectorAll("#tipo button").forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === t));
+  };
+  el.querySelectorAll("#tipo button").forEach((b) => b.addEventListener("click", () => marcarTipo(b.dataset.v)));
+
+  // enquanto digita o nome, a IA sugere vinhos; tocar num preenche o resto
+  const sugs = el.querySelector("#sugs");
+  const mercado = el.querySelector("#mercado");
+  let timer = null, pedido = 0, ultimoTexto = "";
+  form.nome.addEventListener("input", () => {
+    clearTimeout(timer);
+    const texto = form.nome.value.trim();
+    if (texto.length < 4) { sugs.innerHTML = ""; return; }
+    timer = setTimeout(async () => {
+      if (texto === ultimoTexto) return;
+      ultimoTexto = texto;
+      const meu = ++pedido;
+      sugs.innerHTML = `<div class="peq" style="padding:6px 2px">Procurando “${esc(texto)}”…</div>`;
+      try {
+        const { candidatos } = await buscar({ modo: "sugerir", texto });
+        if (meu !== pedido) return;
+        sugs.innerHTML = candidatos.length ? candidatos.map((c, i) => `
+          <button type="button" class="alt" data-i="${i}" style="display:block;width:100%">
+            <b>${esc(c.nome)}${c.safra ? ` ${c.safra}` : ""}</b>
+            <span class="peq" style="display:block">${esc([c.produtor, TIPOS[c.tipo], c.uva, c.pais].filter(Boolean).join(" · "))}</span>
+          </button>`).join("") : `<div class="peq" style="padding:6px 2px">Não achei sugestões. Pode preencher à mão.</div>`;
+        sugs.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => escolher(candidatos[Number(b.dataset.i)])));
+      } catch (e) {
+        if (meu === pedido) sugs.innerHTML = `<div class="peq" style="padding:6px 2px">Sugestões indisponíveis agora (${esc(e.message.slice(0, 60))}).</div>`;
+      }
+    }, 900);
+  });
+
+  // veio da busca com um nome digitado: já procura as sugestões
+  if (manual && form.nome.value.trim().length >= 4) form.nome.dispatchEvent(new Event("input"));
+
+  const escolher = async (c) => {
+    pedido++;
+    sugs.innerHTML = "";
+    form.nome.value = c.nome;
+    ultimoTexto = c.nome;
+    for (const k of ["produtor", "uva", "pais", "regiao", "safra"]) if (c[k] != null) form[k].value = c[k];
+    marcarTipo(c.tipo);
+    S.draft = { ...(S.draft || {}), descricao: c.descricao, teor: c.teor, nota_critica: c.nota_critica, fonte_critica: c.fonte_critica };
+    f.mercado = null;
+    mercado.textContent = "Pesquisando o preço nas lojas…";
+    try {
+      const p = await buscar({ modo: "preco", nome: c.nome, produtor: c.produtor, safra: c.safra });
+      if (form.nome.value !== c.nome) return;
+      f.mercado = { preco_min: p.preco_min, preco_max: p.preco_max, preco_lojas: p.lojas, preco_em: hojeIso() };
+      mercado.textContent = p.preco_min == null ? "Não achei o preço nas lojas."
+        : `${p.estimado ? "Estimativa de mercado" : "Nas lojas"}: ${p.preco_min === p.preco_max ? brl(p.preco_min) : `${brl(p.preco_min)} a ${brl(p.preco_max)}`}`;
+    } catch {
+      mercado.textContent = "";
+    }
+  };
 
   // quem bebeu + notas
   const notas = el.querySelector("#notas");
@@ -111,7 +178,7 @@ export async function telaForm(el, id, modo) {
     notas.innerHTML = ps.map((p) => `
       <div class="nota-linha">
         ${avatar(p)}
-        <div class="quem">Nota ${p === "wang" ? "do Wang" : "da Clara"}${p !== S.pessoa && f.nota[p] == null ? `<div class="peq" style="font-weight:500">pode deixar pra ${p === "wang" ? "ele" : "ela"} dar depois</div>` : ""}</div>
+        <div class="quem">Nota ${p === "wang" ? "do Wang" : "da Clara"}${f.nota[p] == null ? `<div class="peq" style="font-weight:500">toque no + ou deixe pra depois</div>` : ""}</div>
         <button type="button" class="passo" data-p="${p}" data-d="-1" aria-label="Diminuir nota ${p === "wang" ? "do Wang" : "da Clara"}">−</button>
         <div class="nota-val ${f.nota[p] == null ? "vazia" : ""}" aria-live="polite">${f.nota[p] ?? "–"}</div>
         <button type="button" class="passo" data-p="${p}" data-d="1" aria-label="Aumentar nota ${p === "wang" ? "do Wang" : "da Clara"}">+</button>
@@ -159,7 +226,7 @@ export async function telaForm(el, id, modo) {
     const fd = new FormData(form);
     const nome = String(fd.get("nome") || "").trim();
     if (!nome) { erro.textContent = "Falta o nome do vinho."; el.querySelector("details").open = true; return; }
-    if (bebeuP(S.pessoa) && f.nota[S.pessoa] == null) { erro.textContent = "Dê a sua nota (de 0 a 10)."; return; }
+    if (!PESSOAS.some((p) => bebeuP(p) && f.nota[p] != null)) { erro.textContent = "Dê pelo menos uma nota (de 0 a 10)."; return; }
     const preco = String(fd.get("preco_pago") || "").replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
     const safra = Number(fd.get("safra"));
     const linha = {
@@ -176,6 +243,7 @@ export async function telaForm(el, id, modo) {
       preco_pago: preco ? Number(preco) : null,
       onde: String(fd.get("onde") || "").trim() || null,
       compraria: f.compraria,
+      ...(f.mercado || {}),
     };
     btn.disabled = true;
     btn.textContent = "Salvando…";
@@ -183,11 +251,13 @@ export async function telaForm(el, id, modo) {
       const id = await salvar(existente, linha, f);
       await carregar();
       const v = achar(id);
-      if (!existente || !existente.preco_em) atualizarPreco(v).catch(() => {});
+      if (!v.preco_em) atualizarPreco(v).catch(() => {});
       S.draft = null;
       limparBusca();
       toast(modo === "editar" ? "Alterações salvas." : "Salvo na adega!");
-      location.hash = bebeuP(S.pessoa) && v.n[S.pessoa]?.ordem == null ? `#/comparar/${id}` : `#/vinho/${id}`;
+      // encaixa no ranking quem deu nota e ainda não tem posição (primeiro quem está com o celular)
+      const prox = [S.pessoa, outra(S.pessoa)].find((p) => bebeuP(p) && v.n[p]?.nota != null && v.n[p]?.ordem == null);
+      location.hash = prox ? `#/comparar/${id}/${prox}` : `#/vinho/${id}`;
     } catch (err) {
       btn.disabled = false;
       btn.textContent = "Salvar";

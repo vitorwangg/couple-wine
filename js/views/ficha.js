@@ -1,5 +1,5 @@
 // Ficha do vinho: notas, posição nos rankings, valeu o preço?, dados e a foto de vocês.
-import { sb, S, NOMES, PESSOAS, esc, avatar, garrafa, urlDe, assinar, achar, carregar, bebeu, notaDe, media, estrelas, estrelasTxt,
+import { sb, NOMES, PESSOAS, esc, avatar, garrafa, urlDe, assinar, achar, carregar, bebeu, notaDe, media, estrelas, estrelasTxt,
   virgula, brl, fmtData, posicao, grupo, quemTxt, atualizarPreco, toast, TIPOS, ICONE } from "../core.js";
 
 export async function telaFicha(el, id) {
@@ -55,7 +55,8 @@ export async function telaFicha(el, id) {
 
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px">
       ${bebido ? `<a href="#/vinho/${v.id}/editar" class="btn contorno">Editar</a>` : ""}
-      ${bebido && bebeu(v, S.pessoa) && notaDe(v, S.pessoa) != null ? `<a href="#/comparar/${v.id}" class="btn texto" style="align-self:center">Reposicionar no meu ranking</a>` : ""}
+      ${bebido ? PESSOAS.filter((p) => bebeu(v, p) && notaDe(v, p) != null).map((p) =>
+        `<a href="#/comparar/${v.id}/${p}" class="btn texto" style="align-self:center">${v.n[p].ordem == null ? "Encaixar" : "Reposicionar"} no ranking ${p === "wang" ? "do Wang" : "da Clara"}</a>`).join("") : ""}
       <button class="btn texto" id="apagar" style="align-self:center;color:var(--toalha)">${bebido ? "Apagar da adega" : "Tirar da lista"}</button>
     </div>`;
 
@@ -134,7 +135,7 @@ function precoCard(v) {
     </div>
     ${(v.preco_lojas || []).length ? `<div class="tabela">${v.preco_lojas.map((l) => `<div class="ln"><span>${esc(l.loja)}</span><span>${brl(l.preco)}</span></div>`).join("")}</div>` : ""}
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-      <span class="peq">Pesquisado em ${fmtData(v.preco_em)} · estimativa</span>
+      <span class="peq">${(v.preco_lojas || []).length ? `Pesquisado nas lojas em ${fmtData(v.preco_em)}` : `Estimativa da IA (sem pesquisa nas lojas) · ${fmtData(v.preco_em)}`}</span>
       <button class="btn texto" id="preco" style="font-size:13px">Atualizar</button>
     </div>
   </div>`;

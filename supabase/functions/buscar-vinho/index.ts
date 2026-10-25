@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     if (!KEY) throw new Error("Falta configurar o segredo GEMINI_API_KEY no Supabase.");
     if (!(await doCasal(req.headers.get("Authorization")))) return json({ erro: "Só o casal pode buscar." }, 403);
     const body = await req.json();
-    return json(body.modo === "preco" ? await preco(body) : await identificar(body));
+    return json(body.modo === "preco" ? await preco(body) : body.modo === "sugerir" ? await sugerir(body) : await identificar(body));
   } catch (e) {
     return json({ erro: String((e as Error).message || e) }, 500);
   }
@@ -41,26 +41,29 @@ async function doCasal(auth: string | null) {
 
 type Part = { text: string } | { inline_data: { mime_type: string; data: string } };
 
-async function gemini(parts: Part[]) {
-  const body = { contents: [{ parts }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.2 } };
+// pesquisar=true usa a pesquisa do Google; se a cota grátis dela acabar, responde com o que o modelo sabe
+async function gemini(parts: Part[], pesquisar = true) {
   let last: unknown;
-  for (const model of MODELS) {
-    try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "x-goog-api-key": KEY!, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const d = await r.json();
-      const cand = d.candidates?.[0];
-      if (!cand?.content?.parts) throw new Error(d.error?.message || "resposta vazia");
-      const text = cand.content.parts.map((p: { text?: string }) => p.text || "").join("");
-      const fontes = [...new Set((cand.groundingMetadata?.groundingChunks || [])
-        .map((c: { web?: { title?: string } }) => c.web?.title).filter(Boolean))] as string[];
-      return { data: lerJson(text), fontes };
-    } catch (e) {
-      last = e;
-      console.log(`[gemini] ${model}: ${String((e as Error).message || e).slice(0, 120)}`);
+  for (const comBusca of pesquisar ? [true, false] : [false]) {
+    const body = { contents: [{ parts }], ...(comBusca ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.2 } };
+    for (const model of comBusca ? MODELS : [...MODELS].reverse()) {
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST",
+          headers: { "x-goog-api-key": KEY!, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const d = await r.json();
+        const cand = d.candidates?.[0];
+        if (!cand?.content?.parts) throw new Error(d.error?.message || "resposta vazia");
+        const text = cand.content.parts.map((p: { text?: string }) => p.text || "").join("");
+        const fontes = [...new Set((cand.groundingMetadata?.groundingChunks || [])
+          .map((c: { web?: { title?: string } }) => c.web?.title).filter(Boolean))] as string[];
+        return { data: lerJson(text), fontes, pesquisou: comBusca };
+      } catch (e) {
+        last = e;
+        console.log(`[gemini] ${model}${comBusca ? " +google" : ""}: ${String((e as Error).message || e).slice(0, 120)}`);
+      }
     }
   }
   throw new Error(`A busca está sobrecarregada agora. Tente de novo em alguns minutos. (${String((last as Error)?.message || last).slice(0, 80)})`);
@@ -90,16 +93,31 @@ Regras: até 3 candidatos, o mais provável primeiro. safra null se não souber.
   return { candidatos, fontes };
 }
 
+// enquanto digita no cadastro: rápido, sem pesquisa no Google, até 4 vinhos
+async function sugerir(body: { texto?: string }) {
+  const texto = (body.texto || "").trim().slice(0, 120);
+  if (texto.length < 3) return { candidatos: [] };
+  const { data } = await gemini([{
+    text: `Você é um sommelier brasileiro. O casal está digitando o nome de um vinho: "${texto}".
+Liste os vinhos reais que mais provavelmente correspondem (pode ser nome incompleto, abreviado ou com erro de digitação; ex.: "DV Catena" = linha D.V. Catena da Catena Zapata). Se o texto tiver um ano, use como safra.
+Responda SOMENTE com um JSON, sem texto antes ou depois:
+{"candidatos":[{"nome":"nome comercial sem a safra","produtor":"vinícola","safra":2020,"tipo":"tinto|branco|rose","uva":"uva ou corte","pais":"país em português","regiao":"região","teor":"13,5%","descricao":"2 frases em português sobre aromas e boca","nota_critica":4.1,"fonte_critica":"Vivino"}]}
+Regras: até 4 candidatos, o mais provável primeiro. nota_critica de 0 a 5 só se souber, senão null. Espumante conta como "branco". Não invente vinhos que não existem.`,
+  }], false);
+  return { candidatos: (data.candidatos || []).slice(0, 4).map(limpar).filter((c: { nome: string }) => c.nome) };
+}
+
 async function preco(body: { nome: string; produtor?: string; safra?: number }) {
   const vinho = [body.produtor, body.nome, body.safra].filter(Boolean).join(" ");
-  const { data, fontes } = await gemini([{
+  const { data, fontes, pesquisou } = await gemini([{
     text: `Pesquise no Google o preço atual de venda no Brasil, em reais, da garrafa de 750 ml do vinho "${vinho}" — os mesmos preços que aparecem quando se busca o nome do vinho no Google (Google Shopping).
 Inclua lojas de vinho e importadoras (Wine.com.br, Evino, Grand Cru, Divvino, Mistral, Vinci, Casa Flora, World Wine, Vivino Brasil), supermercados e empórios (Pão de Açúcar, Carrefour, Zona Sul, St Marche, Verdemar), Amazon (vendido pela Amazon) e lojas online confiáveis.
 NÃO use marketplaces de vendedores avulsos: Mercado Livre, Shopee, OLX, Magalu marketplace, AliExpress.
 Ignore kits, caixas com várias garrafas, garrafas de outro tamanho e safras muito diferentes.
 Responda SOMENTE com um JSON, sem texto antes ou depois:
 {"preco_min":89.9,"preco_max":129.9,"lojas":[{"loja":"Evino","preco":109.9}]}
-Use só preços que você encontrou de verdade (até 8 lojas, do mais barato ao mais caro). Se não achar nenhum, use null nos preços e lista vazia.`,
+Use só preços que você encontrou de verdade (até 8 lojas, do mais barato ao mais caro).
+Se você não conseguir pesquisar na internet, estime a faixa de preço típica desse vinho no varejo brasileiro hoje e deixe "lojas" vazia. Se não conhecer o vinho, use null nos preços.`,
   }]);
   const proibida = /mercado\s*livre|shopee|olx|aliexpress/i;
   const lojas = (data.lojas || []).filter((l: { loja?: string; preco?: unknown }) => num(l.preco) != null && !proibida.test(String(l.loja)))
@@ -109,7 +127,7 @@ Use só preços que você encontrou de verdade (até 8 lojas, do mais barato ao 
   return {
     preco_min: num(data.preco_min) ?? (ps.length ? Math.min(...ps) : null),
     preco_max: num(data.preco_max) ?? (ps.length ? Math.max(...ps) : null),
-    lojas, fontes,
+    lojas: pesquisou ? lojas : [], fontes, estimado: !pesquisou,
   };
 }
 
