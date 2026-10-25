@@ -1,6 +1,6 @@
 // Base do app: Supabase, estado compartilhado, notas, rankings e fotos.
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/+esm";
-import { SUPABASE_URL, SUPABASE_KEY } from "../config.js";
+import { SUPABASE_URL, SUPABASE_KEY, FUNCAO_BUSCA } from "../config.js";
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
@@ -143,10 +143,10 @@ export async function subirFoto(blob, path) {
 }
 
 // ---------------------------------------------------------------------------
-// Busca (função buscar-vinho no Supabase)
+// Busca (função buscar-vinho, publicada no Supabase com o nome "clever-task")
 // ---------------------------------------------------------------------------
 export async function buscar(body) {
-  const { data, error } = await sb.functions.invoke("buscar-vinho", { body });
+  const { data, error } = await sb.functions.invoke(FUNCAO_BUSCA, { body });
   if (error) {
     let msg = error.message;
     try { msg = (await error.context.json()).erro || msg; } catch { /* resposta sem JSON */ }
