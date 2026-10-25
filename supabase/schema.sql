@@ -14,7 +14,7 @@ create table if not exists private.cw_convites (
 
 insert into private.cw_convites (email, pessoa) values
   ('wangvitor4@gmail.com', 'wang'),
-  ('EMAIL_DA_CLARA', 'clara')
+  ('euclarapessoa@gmail.com', 'clara')
 on conflict (pessoa) do update set email = excluded.email;
 
 create table if not exists public.cw_casal (

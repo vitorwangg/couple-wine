@@ -124,7 +124,7 @@ function precoCard(v) {
     </div>
     <div style="display:flex;align-items:flex-end;gap:18px">
       ${pago != null ? `<div><div class="peq">Pagamos</div><div style="font-family:var(--serif);font-size:28px;line-height:1">${brl(pago)}</div></div>` : ""}
-      <div><div class="peq">Mercado</div><div style="font-family:var(--serif);font-size:${pago != null ? 20 : 28}px;line-height:1.2;color:${pago != null ? "var(--suave)" : "var(--tinta)"}">${min === max ? brl(min) : `${brl(min)}–${brl(max).replace("R$ ", "")}`}</div></div>
+      <div><div class="peq">Nas lojas</div><div style="font-family:var(--serif);font-size:${pago != null ? 20 : 28}px;line-height:1.2;color:${pago != null ? "var(--suave)" : "var(--tinta)"}">${min === max ? brl(min) : `${brl(min)}–${brl(max).replace("R$ ", "")}`}</div></div>
     </div>
     <div class="regua" aria-hidden="true">
       <div class="trilho"></div>

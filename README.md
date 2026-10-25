@@ -12,7 +12,7 @@ App: https://vitorwangg.github.io/couple-wine/
 
 ## Instalar do zero
 
-1. Supabase › SQL Editor: cole `supabase/schema.sql` (troque `EMAIL_DA_CLARA` pelo e-mail dela) e clique em Run.
+1. Supabase › SQL Editor: cole `supabase/schema.sql` e clique em Run.
 2. Supabase › Edge Functions › Deploy a new function › Via Editor: nome `buscar-vinho`, cole `supabase/functions/buscar-vinho/index.ts`, Deploy.
 3. Supabase › Edge Functions › Secrets: adicione `GEMINI_API_KEY` com a chave do Google AI Studio.
 4. Supabase › Authentication › URL Configuration › Redirect URLs: adicione `https://vitorwangg.github.io/couple-wine/**`.

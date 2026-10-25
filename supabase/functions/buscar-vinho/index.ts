@@ -93,14 +93,18 @@ Regras: até 3 candidatos, o mais provável primeiro. safra null se não souber.
 async function preco(body: { nome: string; produtor?: string; safra?: number }) {
   const vinho = [body.produtor, body.nome, body.safra].filter(Boolean).join(" ");
   const { data, fontes } = await gemini([{
-    text: `Pesquise o preço atual de venda no Brasil, em reais, da garrafa de 750 ml do vinho "${vinho}".
-Procure em lojas brasileiras (Wine.com.br, Evino, Grand Cru, Divvino, Mistral, Vivino Brasil, supermercados, Mercado Livre).
+    text: `Pesquise no Google o preço atual de venda no Brasil, em reais, da garrafa de 750 ml do vinho "${vinho}" — os mesmos preços que aparecem quando se busca o nome do vinho no Google (Google Shopping).
+Inclua lojas de vinho e importadoras (Wine.com.br, Evino, Grand Cru, Divvino, Mistral, Vinci, Casa Flora, World Wine, Vivino Brasil), supermercados e empórios (Pão de Açúcar, Carrefour, Zona Sul, St Marche, Verdemar), Amazon (vendido pela Amazon) e lojas online confiáveis.
+NÃO use marketplaces de vendedores avulsos: Mercado Livre, Shopee, OLX, Magalu marketplace, AliExpress.
+Ignore kits, caixas com várias garrafas, garrafas de outro tamanho e safras muito diferentes.
 Responda SOMENTE com um JSON, sem texto antes ou depois:
-{"preco_min":99.9,"preco_max":129.9,"lojas":[{"loja":"Evino","preco":109.9}]}
-Use só preços que você encontrou de verdade (até 5 lojas). Se não achar nenhum, use null nos preços e lista vazia.`,
+{"preco_min":89.9,"preco_max":129.9,"lojas":[{"loja":"Evino","preco":109.9}]}
+Use só preços que você encontrou de verdade (até 8 lojas, do mais barato ao mais caro). Se não achar nenhum, use null nos preços e lista vazia.`,
   }]);
-  const lojas = (data.lojas || []).filter((l: { preco?: unknown }) => num(l.preco) != null).slice(0, 5)
-    .map((l: { loja?: string; preco?: unknown }) => ({ loja: String(l.loja || "loja"), preco: num(l.preco) }));
+  const proibida = /mercado\s*livre|shopee|olx|aliexpress/i;
+  const lojas = (data.lojas || []).filter((l: { loja?: string; preco?: unknown }) => num(l.preco) != null && !proibida.test(String(l.loja)))
+    .map((l: { loja?: string; preco?: unknown }) => ({ loja: String(l.loja || "loja"), preco: num(l.preco) as number }))
+    .sort((a: { preco: number }, b: { preco: number }) => a.preco - b.preco).slice(0, 8);
   const ps = lojas.map((l: { preco: number }) => l.preco);
   return {
     preco_min: num(data.preco_min) ?? (ps.length ? Math.min(...ps) : null),
