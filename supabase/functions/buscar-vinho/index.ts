@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     if (!KEY) throw new Error("Falta configurar o segredo GEMINI_API_KEY no Supabase.");
     if (!(await doCasal(req.headers.get("Authorization")))) return json({ erro: "Só o casal pode buscar." }, 403);
     const body = await req.json();
-    return json(body.modo === "preco" ? await preco(body) : body.modo === "sugerir" ? await sugerir(body) : await identificar(body));
+    return json(body.modo === "preco" ? await preco(body) : body.modo === "sugerir" ? await sugerir(body) : body.modo === "foto" ? { imagem_url: await imagemVivino(String(body.texto || "")) } : await identificar(body));
   } catch (e) {
     return json({ erro: String((e as Error).message || e) }, 500);
   }
@@ -93,18 +93,19 @@ Regras: até 3 candidatos, o mais provável primeiro. safra null se não souber.
   return { candidatos, fontes };
 }
 
-// enquanto digita no cadastro: rápido, sem pesquisa no Google, até 4 vinhos
+// enquanto digita: rápido, sem pesquisa no Google, até 8 vinhos
 async function sugerir(body: { texto?: string }) {
   const texto = (body.texto || "").trim().slice(0, 120);
   if (texto.length < 3) return { candidatos: [] };
   const { data } = await gemini([{
     text: `Você é um sommelier brasileiro. O casal está digitando o nome de um vinho: "${texto}".
 Liste os vinhos reais que mais provavelmente correspondem (pode ser nome incompleto, abreviado ou com erro de digitação; ex.: "DV Catena" = linha D.V. Catena da Catena Zapata). Se o texto tiver um ano, use como safra.
+Se o texto for só o nome de uma vinícola ou de uma linha (ex.: "Montes", "Concha y Toro", "Catena"), liste as linhas e rótulos DIFERENTES dela vendidos no Brasil (ex.: Montes Alpha Cabernet, Montes Classic Series Merlot, Montes Limited Selection, Montes Twins, Purple Angel), dos mais conhecidos aos menos.
 Responda SOMENTE com um JSON, sem texto antes ou depois:
 {"candidatos":[{"nome":"nome comercial sem a safra","produtor":"vinícola","safra":2020,"tipo":"tinto|branco|rose","uva":"uva ou corte","pais":"país em português","regiao":"região","teor":"13,5%","descricao":"2 frases em português sobre aromas e boca","nota_critica":4.1,"fonte_critica":"Vivino"}]}
-Regras: até 4 candidatos, o mais provável primeiro. nota_critica de 0 a 5 só se souber, senão null. Espumante conta como "branco". Não invente vinhos que não existem.`,
+Regras: até 8 candidatos, o mais provável primeiro, sem repetir o mesmo vinho. nota_critica de 0 a 5 só se souber, senão null. Espumante conta como "branco". Não invente vinhos que não existem.`,
   }], false);
-  return { candidatos: (data.candidatos || []).slice(0, 4).map(limpar).filter((c: { nome: string }) => c.nome) };
+  return { candidatos: (data.candidatos || []).slice(0, 8).map(limpar).filter((c: { nome: string }) => c.nome) };
 }
 
 async function preco(body: { nome: string; produtor?: string; safra?: number }) {
